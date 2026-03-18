@@ -1,0 +1,134 @@
+version: "3.9"
+
+# ============================================================
+# CSTGlobal — Full Stack Docker Compose
+# Services: postgres, nextjs app, etl worker, redis (jobs)
+#
+# Usage:
+#   docker compose up             # start everything
+#   docker compose up -d          # detached
+#   docker compose logs -f app    # stream app logs
+#   docker compose run etl        # manual ETL run
+# ============================================================
+
+services:
+
+  # ── PostgreSQL with PostGIS ────────────────────────────────
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: cstglobal_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       cstglobal
+      POSTGRES_USER:     cstglobal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cstglobal_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      # Auto-run schema on first boot
+      - ./schema:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cstglobal -d cstglobal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis (job queue for ETL scheduling) ──────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cstglobal_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Next.js Application ────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      target: ${NODE_ENV:-development}
+    container_name: cstglobal_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV:         ${NODE_ENV:-development}
+      DATABASE_URL:     postgresql://cstglobal:${POSTGRES_PASSWORD:-cstglobal_dev}@postgres:5432/cstglobal
+      REDIS_URL:        redis://redis:6379
+      NEXTAUTH_URL:     ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET:-changeme_in_production_32chars_min}
+      LOG_QUERIES:      ${LOG_QUERIES:-false}
+    volumes:
+      # Hot reload in dev — mount source, exclude node_modules
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Python ETL Worker ──────────────────────────────────────
+  etl:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile.etl
+    container_name: cstglobal_etl
+    restart: unless-stopped
+    environment:
+      DATABASE_URL:     postgresql://cstglobal:${POSTGRES_PASSWORD:-cstglobal_dev}@postgres:5432/cstglobal
+      REDIS_URL:        redis://redis:6379
+      SAM_GOV_API_KEY:  ${SAM_GOV_API_KEY}
+      NYC_APP_TOKEN: pQjuJR9i2cnw0BMkRzS1DrmmL
+      SOCRATA_APP_TOKEN: pQjuJR9i2cnw0BMkRzS1DrmmL
+      ETL_SCHEDULE:     ${ETL_SCHEDULE:-0 */6 * * *}   # every 6 hours
+      LOG_LEVEL:        ${LOG_LEVEL:-INFO}
+    volumes:
+      - etl_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The ETL container runs the scheduler; `docker compose run etl` triggers manually
+
+  # ── pgAdmin (dev only) ─────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: cstglobal_pgadmin
+    profiles: ["dev"]          # only starts with: docker compose --profile dev up
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@cstglobal.dev
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+  redis_data:
+  etl_logs:
+  pgadmin_data:
+
+networks:
+  default:
+    name: cstglobal_network

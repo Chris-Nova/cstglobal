@@ -1,0 +1,19 @@
+# etl/Dockerfile.etl
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy etl source as /app/etl/ subfolder so 'import etl.xxx' works
+COPY . /app/etl/
+
+# Create log directory and ensure __init__.py files exist
+RUN mkdir -p /app/logs && \
+    touch /app/etl/__init__.py && \
+    touch /app/etl/scrapers/__init__.py
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "etl.scheduler"]
