@@ -104,3 +104,45 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ data: result.rows[0] }, { status: 201 });
 }
+
+// ── PUT /api/leads ────────────────────────────────────────────
+// Update a lead — pass lead_id in body to avoid dynamic route type conflicts
+export async function PUT(req: NextRequest) {
+  try {
+    const user = await requireAuth(req);
+
+    const Schema = z.object({
+      lead_id:         z.string().uuid(),
+      status:          z.enum(['Discovery','Qualifying','Bidding','Won','Lost']).optional(),
+      notes:           z.string().max(5000).optional(),
+      position:        z.number().int().min(0).optional(),
+      tags:            z.array(z.string()).optional(),
+    });
+
+    const body = Schema.parse(await req.json());
+    const sets: string[] = ['updated_at = NOW()'];
+    const values: unknown[] = [body.lead_id, user.id];
+    let i = 3;
+
+    if (body.status !== undefined)   { sets.push(`status = $${i++}::lead_status`); values.push(body.status); }
+    if (body.notes !== undefined)    { sets.push(`notes = $${i++}`);               values.push(body.notes); }
+    if (body.position !== undefined) { sets.push(`position = $${i++}`);            values.push(body.position); }
+    if (body.tags !== undefined)     { sets.push(`tags = $${i++}`);                values.push(body.tags); }
+
+    const result = await query(
+      `UPDATE leads SET ${sets.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING id, status, updated_at`,
+      values
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
+    return NextResponse.json({ data: result.rows[0] });
+  } catch (err: any) {
+    if (err.name === 'ZodError') return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+    console.error('[PUT /api/leads]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+

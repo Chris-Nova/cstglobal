@@ -36,7 +36,7 @@ const leadsApi = {
   save:  (projectId, status = "Discovery") =>
     apiFetch("/leads", { method: "POST", body: JSON.stringify({ project_id: projectId, status }) }),
   move:  (leadId, status) =>
-    apiFetch(`/leads/${leadId}`, { method: "PUT", body: JSON.stringify({ status }) }),
+    apiFetch("/leads", { method: "PUT", body: JSON.stringify({ lead_id: leadId, status }) }),
 };
 
 // ─── MOCK DATA (fallback when API unreachable) ────────────────────────────────
@@ -379,6 +379,12 @@ export default function CSTGlobal() {
         { key:"houston_permits",  label:"Houston Permits",      region:"Americas",     type:"City Permit",            count:0, last_run:null },
         { key:"philly_permits",   label:"Philadelphia L&I",     region:"Americas",     type:"City Permit",            count:0, last_run:null },
         { key:"usace",            label:"USACE",                region:"Americas",     type:"Federal Infrastructure", count:0, last_run:null },
+        { key:"philly_arcgis",   label:"Philadelphia L&I",    region:"Americas",     type:"City Permit",            count:0, last_run:null },
+        { key:"denver_permits",  label:"Dallas Permits",      region:"Americas",     type:"City Permit",            count:0, last_run:null },
+        { key:"sf_permits",      label:"SF Building Permits", region:"Americas",     type:"City Permit",            count:0, last_run:null },
+        { key:"boston_permits",   label:"Boston Permits",      region:"Americas",     type:"City Permit",            count:0, last_run:null },
+        { key:"sj_permits",      label:"San Jose Permits",    region:"Americas",     type:"City Permit",            count:0, last_run:null },
+        { key:"baltimore_permits",label:"Baltimore Permits",   region:"Americas",     type:"City Permit",            count:0, last_run:null },
         { key:"ted_eu",           label:"TED EU",               region:"Europe",       type:"Public Tender",          count:0, last_run:null },
         { key:"sam_gov",          label:"SAM.gov",              region:"Americas",     type:"Public Tender",          count:0, last_run:null },
       ]);
@@ -535,7 +541,10 @@ export default function CSTGlobal() {
               <option value="Chicago Permits">Chicago</option>
               <option value="LA Building &amp; Safety">Los Angeles</option>
               <option value="Houston Permits">Houston</option>
+              <option value="Seattle Permits">Seattle</option>
               <option value="Philadelphia L&amp;I">Philadelphia</option>
+              <option value="Dallas Permits">Dallas</option>
+              <option value="SF Building Permits">San Francisco</option>
               <option value="USACE">USACE</option>
             </optgroup>
             <optgroup label="Planning Applications">
