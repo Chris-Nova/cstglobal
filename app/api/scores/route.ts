@@ -3,8 +3,8 @@
 // GET  /api/scores?project_id= — retrieve stored score
 
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '../../lib/db';
-import { requireAuth } from '../../lib/auth';
+import { query } from '../../../lib/db';
+import { requireAuth } from '../../../lib/auth';
 import { z } from 'zod';
 
 // ────────────────────────────────────────────────────────────
