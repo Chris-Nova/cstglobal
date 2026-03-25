@@ -483,7 +483,6 @@ export default function CSTGlobal() {
           .cst-grid-3 { grid-template-columns: 1fr 1fr !important; }
           .cst-grid-5 { grid-template-columns: 1fr 1fr !important; }
           .cst-kpi-grid { grid-template-columns: repeat(2,1fr) !important; }
-          .cst-overlay { display: block !important; }
           .cst-mobile-toggle { display: flex !important; }
           .cst-api-indicator { left: 14px !important; }
           .cst-content-pad { padding: 14px !important; }
@@ -494,7 +493,7 @@ export default function CSTGlobal() {
           .cst-kpi-grid { grid-template-columns: repeat(2,1fr) !important; }
           .cst-topbar { flex-wrap: wrap; gap: 6px !important; }
         }
-        .cst-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 49; }
+        .cst-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 49; }
         .cst-mobile-toggle { display: none; }
       `}</style>
 
@@ -512,7 +511,7 @@ export default function CSTGlobal() {
       </div>
 
       {/* Sidebar overlay for mobile */}
-      <div className="cst-overlay" onClick={()=>setSidebarOpen(false)} />
+      {sidebarOpen && <div className="cst-overlay" onClick={()=>setSidebarOpen(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:49 }} />}
 
       {/* Sidebar */}
       <div className={`cst-sidebar${sidebarOpen?" open":""}`} style={{ position:"fixed", left:0, top:0, bottom:0, width:220, background:"#070E1A", borderRight:"1px solid #1E293B", display:"flex", flexDirection:"column", zIndex:50 }}>
