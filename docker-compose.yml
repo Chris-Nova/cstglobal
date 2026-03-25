@@ -64,7 +64,7 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV:         ${NODE_ENV:-development}
-      DATABASE_URL:     postgresql://cstglobal:${POSTGRES_PASSWORD:-cstglobal_dev}@postgres:5432/cstglobal
+      DATABASE_URL:     ${DATABASE_URL:-postgresql://cstglobal:cstglobal_dev@postgres:5432/cstglobal}
       REDIS_URL:        redis://redis:6379
       NEXTAUTH_URL:     ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET:-changeme_in_production_32chars_min}
@@ -94,7 +94,7 @@ services:
     container_name: cstglobal_etl
     restart: unless-stopped
     environment:
-      DATABASE_URL:     postgresql://cstglobal:${POSTGRES_PASSWORD:-cstglobal_dev}@postgres:5432/cstglobal
+      DATABASE_URL:     ${DATABASE_URL:-postgresql://cstglobal:cstglobal_dev@postgres:5432/cstglobal}
       REDIS_URL:        redis://redis:6379
       SAM_GOV_API_KEY:  ${SAM_GOV_API_KEY}
       NYC_APP_TOKEN: pQjuJR9i2cnw0BMkRzS1DrmmL
