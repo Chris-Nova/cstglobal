@@ -326,6 +326,7 @@ export default function CSTGlobal() {
   const [selected, setSelected]       = useState(null);
   const [tracking, setTracking]       = useState(null);
   const [dragging, setDragging]       = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast]             = useState(null);
   const [filters, setFilters]         = useState({ region:"All", sector:"All", stage:"All", source:"All", q:"" });
   const [sources, setSources]         = useState([]);
@@ -471,6 +472,31 @@ export default function CSTGlobal() {
 
   return (
     <div style={{ minHeight:"100vh", background:mode.bg, fontFamily:"'DM Sans','Segoe UI',sans-serif", color:"#F1F5F9" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .cst-sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }
+          .cst-sidebar.open { transform: translateX(0); }
+          .cst-main { margin-left: 0 !important; }
+          .cst-topbar { padding: 10px 14px !important; }
+          .cst-topbar input { min-width: 100px !important; }
+          .cst-grid-2 { grid-template-columns: 1fr !important; }
+          .cst-grid-3 { grid-template-columns: 1fr 1fr !important; }
+          .cst-grid-5 { grid-template-columns: 1fr 1fr !important; }
+          .cst-kpi-grid { grid-template-columns: repeat(2,1fr) !important; }
+          .cst-overlay { display: block !important; }
+          .cst-mobile-toggle { display: flex !important; }
+          .cst-api-indicator { left: 14px !important; }
+          .cst-content-pad { padding: 14px !important; }
+        }
+        @media (max-width: 480px) {
+          .cst-grid-3 { grid-template-columns: 1fr !important; }
+          .cst-grid-5 { grid-template-columns: 1fr !important; }
+          .cst-kpi-grid { grid-template-columns: repeat(2,1fr) !important; }
+          .cst-topbar { flex-wrap: wrap; gap: 6px !important; }
+        }
+        .cst-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 49; }
+        .cst-mobile-toggle { display: none; }
+      `}</style>
 
       {/* Toast */}
       {toast && (
@@ -480,13 +506,16 @@ export default function CSTGlobal() {
       )}
 
       {/* API indicator */}
-      <div style={{ position:"fixed", bottom:14, left:228, zIndex:50, display:"flex", alignItems:"center", gap:5, fontSize:10, color:"#475569" }}>
+      <div className="cst-api-indicator" style={{ position:"fixed", bottom:14, left:228, zIndex:50, display:"flex", alignItems:"center", gap:5, fontSize:10, color:"#475569" }}>
         <div style={{ width:6, height:6, borderRadius:"50%", background:apiOnline?"#10B981":"#F59E0B" }} />
         {apiOnline?"API Connected":"Demo Mode"}
       </div>
 
+      {/* Sidebar overlay for mobile */}
+      <div className="cst-overlay" onClick={()=>setSidebarOpen(false)} />
+
       {/* Sidebar */}
-      <div style={{ position:"fixed", left:0, top:0, bottom:0, width:220, background:"#070E1A", borderRight:"1px solid #1E293B", display:"flex", flexDirection:"column", zIndex:50 }}>
+      <div className={`cst-sidebar${sidebarOpen?" open":""}`} style={{ position:"fixed", left:0, top:0, bottom:0, width:220, background:"#070E1A", borderRight:"1px solid #1E293B", display:"flex", flexDirection:"column", zIndex:50 }}>
         <div style={{ padding:"22px 20px 18px", borderBottom:"1px solid #1E293B" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{ width:34, height:34, borderRadius:9, background:`linear-gradient(135deg,${accent},${accent}70)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900 }}>C</div>
@@ -526,9 +555,10 @@ export default function CSTGlobal() {
       </div>
 
       {/* Main */}
-      <div style={{ marginLeft:220, minHeight:"100vh" }}>
+      <div className="cst-main" style={{ marginLeft:220, minHeight:"100vh" }}>
         {/* Topbar */}
-        <div style={{ position:"sticky", top:0, background:`${mode.bg}E8`, backdropFilter:"blur(16px)", borderBottom:"1px solid #1E293B", padding:"12px 26px", display:"flex", alignItems:"center", gap:10, zIndex:40, flexWrap:"wrap" }}>
+        <div className="cst-topbar" style={{ position:"sticky", top:0, background:`${mode.bg}E8`, backdropFilter:"blur(16px)", borderBottom:"1px solid #1E293B", padding:"12px 26px", display:"flex", alignItems:"center", gap:10, zIndex:40, flexWrap:"wrap" }}>
+          <button className="cst-mobile-toggle" onClick={()=>setSidebarOpen(o=>!o)} style={{ alignItems:"center", justifyContent:"center", width:34, height:34, background:"#0F172A", border:"1px solid #1E293B", borderRadius:8, color:"#94A3B8", fontSize:18, cursor:"pointer", flexShrink:0 }}>☰</button>
           <input value={filters.q} onChange={e=>setFilters(f=>({...f,q:e.target.value}))} placeholder="Search projects…"
             style={{ flex:1, minWidth:160, maxWidth:300, background:"#0F172A", border:"1px solid #1E293B", borderRadius:9, padding:"8px 14px", color:"#F1F5F9", fontSize:13, outline:"none" }} />
           <select value={filters.region} onChange={e=>setFilters(f=>({...f,region:e.target.value}))} style={sel}>{regions.map(o=><option key={o}>{o}</option>)}</select>
@@ -563,13 +593,13 @@ export default function CSTGlobal() {
           </div>
         </div>
 
-        <div style={{ padding:26 }}>
+        <div className="cst-content-pad" style={{ padding:26 }}>
 
           {/* DISCOVERY FEED */}
           {view==="feed" && (
             <>
               {feedError && <ErrorBanner message={feedError} onRetry={fetchProjects} />}
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
+              <div className="cst-kpi-grid" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
                 {[
                   {label:"Active Projects", value:projects.length, icon:"📂", color:"#0EA5E9"},
                   {label:"Total Pipeline",  value:fmt(totalValue), icon:"💰", color:"#F59E0B"},
@@ -587,7 +617,7 @@ export default function CSTGlobal() {
                 ? <Spinner color={accent} />
                 : projects.length===0
                   ? <div style={{ textAlign:"center", color:"#475569", paddingTop:80 }}>No projects match your filters</div>
-                  : <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:16 }}>
+                  : <div className="cst-grid-2" style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:16 }}>
                       {projects.map(p=><ProjectCard key={p.id} project={p} onView={setSelected} onTrack={handleTrack} tracking={tracking} />)}
                     </div>
               }
@@ -599,7 +629,7 @@ export default function CSTGlobal() {
             <>
               <h2 style={{ fontSize:18, fontWeight:800, marginBottom:18 }}>🌍 Global Project Map</h2>
               <MapCanvas projects={projects.filter(p=>p.geojson)} />
-              <div style={{ marginTop:18, display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
+              <div className="cst-grid-3" style={{ marginTop:18, display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
                 {["Middle East","Asia Pacific","Europe","Americas","Africa","Central Asia"].map(r=>{
                   const rp = projects.filter(p=>p.region===r);
                   return (
@@ -624,7 +654,7 @@ export default function CSTGlobal() {
               {crmError && <ErrorBanner message={crmError} />}
               {loadingCRM
                 ? <Spinner color={accent} />
-                : <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, alignItems:"start" }}>
+                : <div className="cst-grid-5" style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, alignItems:"start" }}>
                     {KANBAN_STAGES.map(stage=>(
                       <div key={stage}
                         style={{ background:"#0F172A", border:"1px solid #1E293B", borderRadius:13, padding:12, minHeight:180 }}
