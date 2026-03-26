@@ -6,13 +6,25 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '../../../lib/db';
-import { requireAuth } from '../../../lib/auth';
 import { z } from 'zod';
+
+// Demo user fallback until auth is built
+const DEMO_USER = { id: '00000000-0000-0000-0000-000000000001', email: 'demo@cstglobal.app', plan: 'Pro' as const };
+
+async function getUser() {
+  // Check if demo user exists, create if not
+  await query(`
+    INSERT INTO users (id, email, full_name, plan, is_active, is_verified)
+    VALUES ($1, $2, 'Demo User', 'Pro', true, true)
+    ON CONFLICT (id) DO NOTHING
+  `, [DEMO_USER.id, DEMO_USER.email]);
+  return DEMO_USER;
+}
 
 // ── GET /api/leads ────────────────────────────────────────────
 // Returns leads grouped by kanban stage for the authenticated user
 export async function GET(req: NextRequest) {
-  const user = await requireAuth(req);
+  const user = await getUser();
 
   const result = await query(`
     SELECT
@@ -71,7 +83,7 @@ export async function GET(req: NextRequest) {
 
 // ── POST /api/leads ───────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  const user = await requireAuth(req);
+  const user = await getUser();
 
   const Schema = z.object({
     project_id: z.string().uuid(),
@@ -109,7 +121,7 @@ export async function POST(req: NextRequest) {
 // Update a lead — pass lead_id in body to avoid dynamic route type conflicts
 export async function PUT(req: NextRequest) {
   try {
-    const user = await requireAuth(req);
+    const user = await getUser();
 
     const Schema = z.object({
       lead_id:         z.string().uuid(),
@@ -144,5 +156,4 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
 
