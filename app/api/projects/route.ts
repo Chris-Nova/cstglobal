@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         p.id,
         p.title,
         p.description,
-        p.value_usd,
+        p.value_usd::float AS value_usd,
         p.value_currency,
         p.location_display,
         p.location_country,

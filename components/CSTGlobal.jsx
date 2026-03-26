@@ -69,7 +69,7 @@ const MODES = [
   { key:"software",     label:"Software",     accent:"#0EA5E9", bg:"#050D1A" },
 ];
 
-const fmt = (n) => !n ? "N/A" : n >= 1e9 ? `$${(n/1e9).toFixed(1)}B` : `$${(n/1e6).toFixed(0)}M`;
+const fmt = (n) => { const v = parseFloat(n); return (!v || isNaN(v)) ? "N/A" : v >= 1e9 ? `$${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `$${(v/1e6).toFixed(0)}M` : v >= 1e3 ? `$${(v/1e3).toFixed(0)}K` : `$${v}`; };
 const scoreColor = (s) => s >= 80 ? "#10B981" : s >= 60 ? "#F59E0B" : "#EF4444";
 
 // ─── UI PRIMITIVES ────────────────────────────────────────────────────────────
@@ -542,7 +542,7 @@ export default function CSTGlobal() {
   }, [dragging, notify]);
 
   const displayProjects = projects;
-  const totalValue = displayProjects.reduce((s,p)=>s+(p.value_usd||0),0);
+  const totalValue = displayProjects.reduce((s,p)=>s+(Number(p.value_usd)||0), 0);
   const avgScore   = projects.length ? Math.round(projects.reduce((s,p)=>s+p.score,0)/projects.length) : 0;
   const regions    = ["All",...new Set(MOCK_PROJECTS.map(p=>p.region))];
   const sectors    = ["All",...new Set(MOCK_PROJECTS.map(p=>p.sector))];
@@ -729,7 +729,7 @@ export default function CSTGlobal() {
                     <div key={r} style={{ background:"#0F172A", border:"1px solid #1E293B", borderRadius:12, padding:14 }}>
                       <div style={{ fontSize:12, fontWeight:700 }}>{r}</div>
                       <div style={{ fontSize:20, fontWeight:800, color:accent, fontFamily:"monospace" }}>{rp.length} <span style={{ fontSize:12, color:"#64748B", fontFamily:"inherit" }}>projects</span></div>
-                      <div style={{ fontSize:11, color:"#64748B" }}>{fmt(rp.reduce((s,p)=>s+(p.value_usd||0),0))} total</div>
+                      <div style={{ fontSize:11, color:"#64748B" }}>{fmt(rp.reduce((s,p)=>s+(Number(p.value_usd)||0),0))} total</div>
                     </div>
                   );
                 })}
