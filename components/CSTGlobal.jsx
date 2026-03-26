@@ -279,12 +279,19 @@ function ProjectModal({ project, onClose, onTrack }) {
           )}
 
           {/* Map pin */}
-          {(lat && lng) && (
-            <div style={{ marginBottom:24 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:10 }}>LOCATION</div>
-              <ProjectDetailMap lat={lat} lng={lng} title={project.title} />
-            </div>
-          )}
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:10 }}>LOCATION</div>
+            {(lat && lng)
+              ? <ProjectDetailMap lat={lat} lng={lng} title={project.title} />
+              : <div style={{ background:"#0F172A", border:"1px solid #1E293B", borderRadius:12, padding:"20px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                  <span style={{ fontSize:24 }}>📍</span>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, color:"#F1F5F9" }}>{project.location_display || "Location not specified"}</div>
+                    <div style={{ fontSize:11, color:"#475569", marginTop:3 }}>Precise coordinates not available for this project</div>
+                  </div>
+                </div>
+            }
+          </div>
 
           {/* Milestones */}
           {project.milestones?.length > 0 && (
