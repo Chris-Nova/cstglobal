@@ -157,3 +157,25 @@ export async function PUT(req: NextRequest) {
   }
 }
 
+// ── DELETE /api/leads ─────────────────────────────────────────
+// Remove a lead — pass lead_id in body
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getUser();
+    const { lead_id } = await req.json();
+    if (!lead_id) return NextResponse.json({ error: 'lead_id required' }, { status: 400 });
+
+    const result = await query(
+      'DELETE FROM leads WHERE id = $1 AND user_id = $2 RETURNING id',
+      [lead_id, user.id]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
+    return NextResponse.json({ data: { deleted: lead_id } });
+  } catch (err) {
+    console.error('[DELETE /api/leads]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

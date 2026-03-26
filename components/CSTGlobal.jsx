@@ -37,6 +37,8 @@ const leadsApi = {
     apiFetch("/leads", { method: "POST", body: JSON.stringify({ project_id: projectId, status }) }),
   move:  (leadId, status) =>
     apiFetch("/leads", { method: "PUT", body: JSON.stringify({ lead_id: leadId, status }) }),
+  remove: (leadId) =>
+    apiFetch("/leads", { method: "DELETE", body: JSON.stringify({ lead_id: leadId }) }),
 };
 
 // ─── MOCK DATA (fallback when API unreachable) ────────────────────────────────
@@ -346,11 +348,27 @@ function ProjectModal({ project, onClose, onTrack }) {
 }
 
 // ─── KANBAN CARD ──────────────────────────────────────────────────────────────
-function KanbanCard({ lead, isDragging }) {
+function KanbanCard({ lead, isDragging, onRemove }) {
   const sc = SECTOR_COLORS[lead.sector]||"#F59E0B";
+  const [showConfirm, setShowConfirm] = useState(false);
   return (
-    <div style={{ background:"#0F172A", border:"1px solid #1E293B", borderRadius:10, padding:13, marginBottom:9, cursor:"grab", opacity:isDragging?0.4:1, transition:"opacity 0.15s", borderLeft:`3px solid ${sc}` }}>
-      <div style={{ fontSize:12, fontWeight:700, color:"#F1F5F9", marginBottom:5, lineHeight:1.4 }}>{lead.title}</div>
+    <div style={{ background:"#0F172A", border:"1px solid #1E293B", borderRadius:10, padding:13, marginBottom:9, cursor:"grab", opacity:isDragging?0.4:1, transition:"opacity 0.15s", borderLeft:`3px solid ${sc}`, position:"relative" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:"#F1F5F9", marginBottom:5, lineHeight:1.4, flex:1 }}>{lead.title}</div>
+        <button
+          onClick={e=>{e.stopPropagation();setShowConfirm(true);}}
+          style={{ background:"transparent", border:"none", color:"#475569", cursor:"pointer", fontSize:14, padding:"0 2px", flexShrink:0, lineHeight:1 }}
+          title="Remove from tracker">×</button>
+      </div>
+      {showConfirm && (
+        <div style={{ position:"absolute", inset:0, background:"#0F172A", borderRadius:10, border:"1px solid #EF444460", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10, zIndex:10, padding:12 }}>
+          <div style={{ fontSize:12, color:"#F1F5F9", textAlign:"center" }}>Remove from Lead Tracker?</div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={e=>{e.stopPropagation();setShowConfirm(false);}} style={{ padding:"5px 14px", borderRadius:7, background:"#1E293B", border:"1px solid #334155", color:"#94A3B8", fontSize:11, cursor:"pointer" }}>Cancel</button>
+            <button onClick={e=>{e.stopPropagation();onRemove(lead);}} style={{ padding:"5px 14px", borderRadius:7, background:"#EF4444", border:"none", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>Remove</button>
+          </div>
+        </div>
+      )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span style={{ fontSize:10, color:"#64748B" }}>{lead.location_display}</span>
         <span style={{ fontSize:12, fontWeight:700, color:"#F59E0B" }}>{fmt(lead.value_usd)}</span>
@@ -531,6 +549,17 @@ export default function CSTGlobal() {
       });
     } finally { setTracking(null); }
   }, [view, fetchBoard, notify]);
+
+  const handleUntrack = useCallback(async (lead) => {
+    const leadId = lead.lead_id || lead.id;
+    setBoard(b => {
+      const stage = lead.status || "Discovery";
+      return { ...b, [stage]: b[stage].filter(l=>(l.lead_id||l.id)!==leadId) };
+    });
+    notify("Removed from Lead Tracker", "#EF4444");
+    try { await leadsApi.remove(leadId); }
+    catch { fetchBoard(); }
+  }, [fetchBoard, notify]);
 
   // ── Drag and drop ──────────────────────────────────────────
   const handleDrop = useCallback(async (e, toStage) => {
@@ -767,7 +796,7 @@ export default function CSTGlobal() {
                           <div key={lead.lead_id||lead.id} draggable
                             onDragStart={()=>setDragging({lead,fromStage:stage})}
                             onDragEnd={()=>setDragging(null)}>
-                            <KanbanCard lead={lead} isDragging={dragging?.lead&&(dragging.lead.lead_id||dragging.lead.id)===(lead.lead_id||lead.id)} />
+                            <KanbanCard lead={lead} isDragging={dragging?.lead&&(dragging.lead.lead_id||dragging.lead.id)===(lead.lead_id||lead.id)} onRemove={handleUntrack} />
                           </div>
                         ))}
                         {!(board[stage]||[]).length && (
