@@ -327,6 +327,7 @@ export default function CSTGlobal() {
   const [tracking, setTracking]       = useState(null);
   const [dragging, setDragging]       = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [biddableOnly, setBiddableOnly] = useState(false);
   const [toast, setToast]             = useState(null);
   const [filters, setFilters]         = useState({ region:"All", sector:"All", stage:"All", source:"All", q:"" });
   const [sources, setSources]         = useState([]);
@@ -454,7 +455,10 @@ export default function CSTGlobal() {
     catch { notify("Sync failed — move may not persist","#EF4444"); }
   }, [dragging, notify]);
 
-  const totalValue = projects.reduce((s,p)=>s+(p.value_usd||0),0);
+  const displayProjects = biddableOnly
+    ? projects.filter(p => ["Planning","Tender"].includes(p.stage))
+    : projects;
+  const totalValue = displayProjects.reduce((s,p)=>s+(p.value_usd||0),0);
   const avgScore   = projects.length ? Math.round(projects.reduce((s,p)=>s+p.score,0)/projects.length) : 0;
   const regions    = ["All",...new Set(MOCK_PROJECTS.map(p=>p.region))];
   const sectors    = ["All",...new Set(MOCK_PROJECTS.map(p=>p.sector))];
@@ -587,8 +591,14 @@ export default function CSTGlobal() {
               <option value="SAM.gov">SAM.gov</option>
             </optgroup>
           </select>
+          <button
+            onClick={()=>setBiddableOnly(b=>!b)}
+            title="Show only biddable projects (Planning & Tender)"
+            style={{ padding:"7px 13px", borderRadius:8, border:`1px solid ${biddableOnly?accent+"80":"#1E293B"}`, background:biddableOnly?`${accent}18`:"#0F172A", color:biddableOnly?accent:"#64748B", fontSize:11, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:5, transition:"all 0.15s" }}>
+            🎯 {biddableOnly?"Biddable Only":"All Stages"}
+          </button>
           <div style={{ marginLeft:"auto", fontSize:12, color:"#475569", whiteSpace:"nowrap" }}>
-            <span style={{color:accent,fontWeight:700}}>{projects.length}</span> projects · <span style={{color:accent,fontWeight:700}}>{fmt(totalValue)}</span>
+            <span style={{color:accent,fontWeight:700}}>{displayProjects.length}</span> projects · <span style={{color:accent,fontWeight:700}}>{fmt(totalValue)}</span>
           </div>
         </div>
 
@@ -617,7 +627,7 @@ export default function CSTGlobal() {
                 : projects.length===0
                   ? <div style={{ textAlign:"center", color:"#475569", paddingTop:80 }}>No projects match your filters</div>
                   : <div className="cst-grid-2" style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:16 }}>
-                      {projects.map(p=><ProjectCard key={p.id} project={p} onView={setSelected} onTrack={handleTrack} tracking={tracking} />)}
+                      {displayProjects.map(p=><ProjectCard key={p.id} project={p} onView={setSelected} onTrack={handleTrack} tracking={tracking} />)}
                     </div>
               }
             </>
