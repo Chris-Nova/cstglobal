@@ -1,18 +1,19 @@
 // app/api/projects/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '../../../lib/db';
+import { query } from '@/lib/db';
 import { z } from 'zod';
 
 const GetProjectsSchema = z.object({
-  region:  z.string().optional(),
-  sector:  z.string().optional(),
-  stage:   z.string().optional(),
-  source:  z.string().optional(),
-  q:       z.string().max(200).optional(),
-  page:    z.coerce.number().min(1).default(1),
-  limit:   z.coerce.number().min(1).max(100).default(24),
-  sortBy:  z.enum(['value_usd', 'last_verified_at', 'created_at']).default('last_verified_at'),
-  sortDir: z.enum(['asc', 'desc']).default('desc'),
+  region:   z.string().optional(),
+  sector:   z.string().optional(),
+  stage:    z.string().optional(),
+  biddable: z.string().optional(),
+  source:   z.string().optional(),
+  q:        z.string().max(200).optional(),
+  page:     z.coerce.number().min(1).default(1),
+  limit:    z.coerce.number().min(1).max(500).default(24),
+  sortBy:   z.enum(['value_usd', 'last_verified_at', 'created_at']).default('last_verified_at'),
+  sortDir:  z.enum(['asc', 'desc']).default('desc'),
 });
 
 export async function GET(req: NextRequest) {
@@ -36,7 +37,12 @@ export async function GET(req: NextRequest) {
       conditions.push(`p.sector = $${i++}::project_sector`);
       values.push(params.sector);
     }
-    if (params.stage) {
+    if (params.biddable) {
+      const stages = params.biddable.split(',').map(s => s.trim());
+      const placeholders = stages.map(() => `$${i++}`).join(',');
+      conditions.push(`p.stage = ANY(ARRAY[${placeholders}]::project_stage[])`);
+      values.push(...stages);
+    } else if (params.stage) {
       conditions.push(`p.stage = $${i++}::project_stage`);
       values.push(params.stage);
     }

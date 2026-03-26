@@ -180,75 +180,159 @@ function ProjectCard({ project, onView, onTrack, tracking }) {
 }
 
 // ─── PROJECT MODAL ────────────────────────────────────────────────────────────
+function ProjectDetailMap({ lat, lng, title }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (!lat || !lng || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    // Simple world map grid background
+    ctx.fillStyle = "#0A0F1E"; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = "#1E293B"; ctx.lineWidth = 0.5;
+    for (let i=0;i<=12;i++){const x=i/12*W;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for (let i=0;i<=6;i++){const y=i/6*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    // Plot pin
+    const x = (lng+180)/360*W;
+    const y = (90-lat)/180*H;
+    // Pulse ring
+    ctx.beginPath();ctx.arc(x,y,22,0,Math.PI*2);ctx.fillStyle="#F59E0B15";ctx.fill();
+    ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fillStyle="#F59E0B30";ctx.fill();
+    // Pin body
+    const g = ctx.createRadialGradient(x-3,y-3,0,x,y,10);
+    g.addColorStop(0,"#FCD34D");g.addColorStop(1,"#F59E0B");
+    ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+    ctx.strokeStyle="#FCD34D";ctx.lineWidth=1.5;ctx.stroke();
+    // Label
+    ctx.fillStyle="#F1F5F9";ctx.font="bold 10px 'DM Sans',sans-serif";
+    ctx.textAlign="center";ctx.textBaseline="bottom";
+    ctx.fillStyle="#0A0F1E90";
+    const lw = ctx.measureText(title.slice(0,28)).width+16;
+    ctx.fillRect(x-lw/2, y-36, lw, 18);
+    ctx.fillStyle="#F1F5F9";
+    ctx.fillText(title.slice(0,28)+(title.length>28?"…":""), x, y-20);
+  }, [lat, lng, title]);
+  return (
+    <div style={{ borderRadius:12, overflow:"hidden", border:"1px solid #1E293B", position:"relative" }}>
+      <canvas ref={canvasRef} width={640} height={200} style={{ width:"100%", display:"block" }} />
+      <div style={{ position:"absolute", bottom:8, right:10, fontSize:9, color:"#475569" }}>
+        {lat?.toFixed(4)}, {lng?.toFixed(4)}
+      </div>
+    </div>
+  );
+}
+
 function ProjectModal({ project, onClose, onTrack }) {
   if (!project) return null;
-  const sc = SECTOR_COLORS[project.sector]||"#F59E0B";
-  const stc = STAGE_COLORS[project.stage]||"#94A3B8";
+  const sc  = SECTOR_COLORS[project.sector] || "#F59E0B";
+  const stc = STAGE_COLORS[project.stage]   || "#94A3B8";
+  const lat = project.geojson?.coordinates?.[1] ?? project.lat;
+  const lng = project.geojson?.coordinates?.[0] ?? project.lng;
+
   return (
-    <div style={{ position:"fixed", inset:0, background:"#00000090", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100, padding:24 }} onClick={onClose}>
-      <div style={{ background:"#0F172A", border:"1px solid #1E293B", borderRadius:20, maxWidth:680, width:"100%", maxHeight:"90vh", overflowY:"auto", padding:32 }} onClick={e=>e.stopPropagation()}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
-              <span style={{ fontSize:10, fontWeight:700, padding:"2px 10px", borderRadius:20, background:`${sc}20`, color:sc }}>{project.sector}</span>
-              <span style={{ fontSize:10, fontWeight:700, padding:"2px 10px", borderRadius:20, background:`${stc}20`, color:stc }}>{project.stage}</span>
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", zIndex:100, overflowY:"auto", padding:"24px 0" }} onClick={onClose}>
+      <div style={{ background:"#070E1A", border:"1px solid #1E293B", borderRadius:20, maxWidth:760, width:"calc(100% - 32px)", margin:"0 auto", overflow:"hidden" }} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ background:"#0F172A", borderBottom:"1px solid #1E293B", padding:"24px 28px 20px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12 }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:"flex", gap:7, marginBottom:10, flexWrap:"wrap" }}>
+                <span style={{ fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, background:`${sc}20`, color:sc }}>{project.sector}</span>
+                <span style={{ fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, background:`${stc}20`, color:stc }}>{project.stage}</span>
+                <span style={{ fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, background:"#1E293B", color:"#64748B" }}>{project.source_name}</span>
+              </div>
+              <h2 style={{ fontSize:20, fontWeight:800, color:"#F1F5F9", margin:"0 0 6px", lineHeight:1.3 }}>{project.title}</h2>
+              <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+                <span style={{ color:"#64748B", fontSize:12 }}>📍 {project.location_display}</span>
+                {project.timeline_display && <span style={{ color:"#64748B", fontSize:12 }}>🗓 {project.timeline_display}</span>}
+              </div>
             </div>
-            <h2 style={{ fontSize:20, fontWeight:800, color:"#F1F5F9", margin:0 }}>{project.title}</h2>
-            <p style={{ color:"#64748B", fontSize:12, marginTop:4 }}>📍 {project.location_display} · {project.timeline_display}</p>
+            <button onClick={onClose} style={{ background:"#1E293B", border:"none", color:"#94A3B8", width:36, height:36, borderRadius:9, cursor:"pointer", fontSize:20, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
           </div>
-          <button onClick={onClose} style={{ background:"#1E293B", border:"none", color:"#94A3B8", width:34, height:34, borderRadius:8, cursor:"pointer", fontSize:18, flexShrink:0, marginLeft:12 }}>×</button>
         </div>
 
-        {project.description && <p style={{ color:"#94A3B8", fontSize:13, lineHeight:1.7, marginTop:16 }}>{project.description}</p>}
+        <div style={{ padding:"24px 28px" }}>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginTop:22 }}>
-          {[["Value",fmt(project.value_usd),"#F59E0B"],["AI Score",`${project.score}/100`,scoreColor(project.score)],["Verified",project.last_verified_at?.slice(0,10),"#0EA5E9"]].map(([l,v,c])=>(
-            <div key={l} style={{ background:"#0A0F1E", borderRadius:10, padding:"12px 14px", border:"1px solid #1E293B" }}>
-              <div style={{ fontSize:10, color:"#64748B" }}>{l}</div>
-              <div style={{ fontSize:16, fontWeight:800, color:c, marginTop:4 }}>{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {project.milestones?.length > 0 && (
-          <div style={{ marginTop:24 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#F1F5F9", letterSpacing:"0.08em", marginBottom:4 }}>PROJECT TIMELINE</div>
-            <Timeline milestones={project.milestones} activeMs={project.active_milestone} />
+          {/* KPI row */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:24 }}>
+            {[
+              ["Contract Value", fmt(project.value_usd), "#F59E0B"],
+              ["AI Score",       `${project.score || "—"}/100`, scoreColor(project.score||0)],
+              ["Last Verified",  project.last_verified_at?.slice(0,10) || "—", "#0EA5E9"],
+            ].map(([l,v,c])=>(
+              <div key={l} style={{ background:"#0A0F1E", borderRadius:10, padding:"14px 16px", border:"1px solid #1E293B" }}>
+                <div style={{ fontSize:10, color:"#475569", fontWeight:600, letterSpacing:"0.06em" }}>{l.toUpperCase()}</div>
+                <div style={{ fontSize:18, fontWeight:800, color:c, marginTop:6, fontFamily:"monospace" }}>{v}</div>
+              </div>
+            ))}
           </div>
-        )}
 
-        {project.stakeholders?.length > 0 && (
-          <div style={{ marginTop:24 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#F1F5F9", letterSpacing:"0.08em", marginBottom:12 }}>STAKEHOLDERS</div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))", gap:10 }}>
-              {project.stakeholders.map((s,i)=>(
-                <div key={i} style={{ background:"#0A0F1E", borderRadius:10, padding:12, border:"1px solid #1E293B" }}>
-                  <div style={{ fontSize:9, color:"#64748B", fontWeight:600, letterSpacing:"0.06em" }}>{(s.role||"").toUpperCase()}</div>
-                  <div style={{ fontSize:13, color:"#F1F5F9", fontWeight:600, marginTop:4 }}>{s.name||"TBD"}</div>
-                </div>
-              ))}
+          {/* Description */}
+          {project.description && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:10 }}>PROJECT OVERVIEW</div>
+              <p style={{ color:"#94A3B8", fontSize:13, lineHeight:1.8, margin:0, background:"#0F172A", borderRadius:10, padding:"14px 16px", border:"1px solid #1E293B" }}>
+                {project.description}
+              </p>
+            </div>
+          )}
+
+          {/* Map pin */}
+          {(lat && lng) && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:10 }}>LOCATION</div>
+              <ProjectDetailMap lat={lat} lng={lng} title={project.title} />
+            </div>
+          )}
+
+          {/* Milestones */}
+          {project.milestones?.length > 0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:10 }}>PROJECT MILESTONES</div>
+              <Timeline milestones={project.milestones} activeMs={project.active_milestone} />
+            </div>
+          )}
+
+          {/* Stakeholders */}
+          {project.stakeholders?.length > 0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:12 }}>STAKEHOLDERS</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:10 }}>
+                {project.stakeholders.map((s,i)=>(
+                  <div key={i} style={{ background:"#0F172A", borderRadius:10, padding:"12px 14px", border:"1px solid #1E293B" }}>
+                    <div style={{ fontSize:9, color:"#475569", fontWeight:700, letterSpacing:"0.06em" }}>{(s.role||"").toUpperCase()}</div>
+                    <div style={{ fontSize:13, color:"#F1F5F9", fontWeight:600, marginTop:5 }}>{s.name||"TBD"}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* AI Scoring breakdown */}
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#475569", letterSpacing:"0.08em", marginBottom:12 }}>AI SCORING BREAKDOWN</div>
+            <div style={{ background:"#0F172A", borderRadius:10, padding:"16px", border:"1px solid #1E293B" }}>
+              <ProgressBar label="Sector & Region Match" value={project.match_score}    max={40} color="#10B981" />
+              <ProgressBar label="Budget Alignment"      value={project.budget_score}   max={35} color="#0EA5E9" />
+              <ProgressBar label="Timeline Fit"          value={project.timeline_score} max={25} color="#F59E0B" />
             </div>
           </div>
-        )}
 
-        <div style={{ marginTop:24 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:"#F1F5F9", letterSpacing:"0.08em", marginBottom:10 }}>AI SCORING BREAKDOWN</div>
-          <ProgressBar label="Sector & Region Match" value={project.match_score}    max={40} color="#10B981" />
-          <ProgressBar label="Budget Alignment"      value={project.budget_score}   max={35} color="#0EA5E9" />
-          <ProgressBar label="Timeline Fit"          value={project.timeline_score} max={25} color="#F59E0B" />
+          {/* Actions */}
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            {project.source_url && (
+              <a href={project.source_url} target="_blank" rel="noopener noreferrer"
+                style={{ flex:1, minWidth:140, display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8, padding:"11px 0", background:"#0F172A", border:"1px solid #334155", borderRadius:10, color:"#94A3B8", fontSize:13, fontWeight:600, textDecoration:"none" }}>
+                🔗 Source Listing
+              </a>
+            )}
+            <button onClick={()=>{onTrack(project);onClose();}}
+              style={{ flex:2, minWidth:200, padding:"11px 0", borderRadius:10, background:"#F59E0B", border:"none", color:"#0A0F1E", fontSize:14, fontWeight:800, cursor:"pointer" }}>
+              + Track This Lead
+            </button>
+          </div>
         </div>
-
-        {project.source_url && (
-          <a href={project.source_url} target="_blank" rel="noopener noreferrer"
-            style={{ display:"inline-flex", alignItems:"center", gap:8, marginTop:20, padding:"9px 16px", background:"#1E293B", border:"1px solid #334155", borderRadius:9, color:"#94A3B8", fontSize:12, fontWeight:600, textDecoration:"none" }}>
-            🔗 View Source Listing
-          </a>
-        )}
-
-        <button onClick={()=>{onTrack(project);onClose();}}
-          style={{ display:"block", width:"100%", marginTop:20, padding:"12px 0", borderRadius:10, background:"#F59E0B", border:"none", color:"#0A0F1E", fontSize:14, fontWeight:800, cursor:"pointer" }}>
-          + Track This Lead
-        </button>
       </div>
     </div>
   );
@@ -345,7 +429,9 @@ export default function CSTGlobal() {
   const fetchProjects = useCallback(async () => {
     setLoadingFeed(true); setFeedError(null);
     try {
-      const res = await projectsApi.list({ region:filters.region, sector:filters.sector, stage:filters.stage, source:filters.source, q:filters.q, limit:24 });
+      const stageFilter = biddableOnly ? undefined : (filters.stage !== 'All' ? filters.stage : undefined);
+      const biddableStages = biddableOnly ? 'Planning,Tender' : undefined;
+      const res = await projectsApi.list({ region:filters.region, sector:filters.sector, stage:stageFilter, biddable:biddableStages, source:filters.source, q:filters.q, limit:200 });
       setProjects(res.data);
       setApiOnline(true);
     } catch(err) {
@@ -360,7 +446,7 @@ export default function CSTGlobal() {
       setProjects(mock);
       setFeedError(err.message);
     } finally { setLoadingFeed(false); }
-  }, [filters]);
+  }, [filters, biddableOnly]);
 
   // ── Fetch ETL sources ──────────────────────────────────────
   const fetchSources = useCallback(async () => {
@@ -455,9 +541,7 @@ export default function CSTGlobal() {
     catch { notify("Sync failed — move may not persist","#EF4444"); }
   }, [dragging, notify]);
 
-  const displayProjects = biddableOnly
-    ? projects.filter(p => ["Planning","Tender"].includes(p.stage))
-    : projects;
+  const displayProjects = projects;
   const totalValue = displayProjects.reduce((s,p)=>s+(p.value_usd||0),0);
   const avgScore   = projects.length ? Math.round(projects.reduce((s,p)=>s+p.score,0)/projects.length) : 0;
   const regions    = ["All",...new Set(MOCK_PROJECTS.map(p=>p.region))];
