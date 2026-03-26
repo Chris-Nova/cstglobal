@@ -133,6 +133,7 @@ class NYCPermitScraper(BaseScraper):
                 f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
                 params={
                     "$limit": 1000,
+                    "$where": "job_status_descrp NOT IN ('COMPLETED','SIGNED OFF')",
                     "$$app_token": app_token,
                 },
                 headers={"Accept": "application/json"},
@@ -201,7 +202,9 @@ class NYCPermitScraper(BaseScraper):
 
         # Stage — confirmed status values from CSV
         status = (raw.get("job_status_descrp") or raw.get("job_status") or "").upper()
-        stage = "Awarded" if any(s in status for s in ("SIGNED OFF", "PERMIT ISSUED", "APPROVED")) else "Planning"
+        if any(s in status for s in ("SIGNED OFF", "COMPLETED", "CERTIFICATE OF OCCUPANCY")):
+            return None  # skip non-actionable
+        stage = "Tender" if "PERMIT ISSUED" in status else "Planning"
 
         # Owner — confirmed column names
         biz   = raw.get("owner_s_business_name") or ""
@@ -248,7 +251,7 @@ class ChicagoPermitScraper(BaseScraper):
         try:
             resp = requests.get(
                 f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
-                params={"$limit": 1000, "$$app_token": app_token},
+                params={"$limit": 1000, "$where": "permit_status NOT IN ('COMPLETE','ISSUED')", "$$app_token": app_token},
                 headers={"Accept": "application/json"},
                 timeout=30,
             )
@@ -575,7 +578,9 @@ class PhiladelphiaPermitScraper(BaseScraper):
         issue_date = (raw.get("issueddate") or raw.get("issue_date") or raw.get("applieddate") or "")[:10]
 
         status = (raw.get("statuscurrent") or raw.get("status") or "").lower()
-        stage  = "Awarded" if "issued" in status or "complete" in status else "Planning"
+        if any(s in status for s in ("complete", "cancelled", "expired", "withdrawn")):
+            return None  # skip non-actionable
+        stage  = "Awarded" if "issued" in status else "Planning"
 
         return ProjectRecord(
             external_id      = f"sea-{permit_id}",
@@ -873,7 +878,9 @@ class DenverPermitScraper(BaseScraper):
         contractor = raw.get("contractor_name") or raw.get("contractorname") or raw.get("contractor") or ""
         issue_date = (raw.get("issue_date") or raw.get("issueddate") or raw.get("permit_date") or "")[:10]
         status     = (raw.get("status") or raw.get("statuscurrent") or "").lower()
-        stage      = "Awarded" if "issued" in status or "complete" in status or "approved" in status else "Planning"
+        if any(s in status for s in ("complete", "cancelled", "expired", "withdrawn", "final")):
+            return None  # skip non-actionable
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
 
         return ProjectRecord(
             external_id      = f"dal-{permit_id}",
@@ -961,7 +968,9 @@ class SanFranciscoPermitScraper(BaseScraper):
             lat, lng = None, None
 
         status = (raw.get("status") or raw.get("current_status") or "").lower()
-        stage  = "Awarded" if any(s in status for s in ("issued", "complete", "approved")) else "Planning"
+        if any(s in status for s in ("complete", "cancelled", "expired", "withdrawn", "revoked")):
+            return None  # skip non-actionable
+        stage  = "Awarded" if any(s in status for s in ("issued", "approved")) else "Planning"
 
         contractor = raw.get("contractor") or raw.get("applicant") or ""
         issue_date = (raw.get("issued_date") or raw.get("filed_date") or "")[:10]
@@ -1216,7 +1225,9 @@ class BaltimorePermitScraper(BaseScraper):
         contractor = raw.get("contractor_name") or raw.get("contractorname") or raw.get("contractor") or ""
         issue_date = (raw.get("issued_date") or raw.get("issue_date") or raw.get("permitissueddate") or "")[:10]
         status     = (raw.get("status") or raw.get("statusdate") or "").lower()
-        stage      = "Awarded" if any(s in status for s in ("issued", "approved", "complete")) else "Planning"
+        if any(s in status for s in ("complete", "cancelled", "expired", "withdrawn")):
+            return None  # skip non-actionable
+        stage      = "Awarded" if any(s in status for s in ("issued", "approved")) else "Planning"
         return ProjectRecord(
             external_id      = f"bal-{permit_id}",
             source_name      = self.source_name,

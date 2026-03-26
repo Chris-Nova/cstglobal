@@ -161,7 +161,10 @@ class TedEUScraper(BaseScraper):
 
         # Stage inference from notice type code
         type_code = raw.get("TW", {}).get("value", "")
-        stage_map = {"F02": "Tender", "F03": "Awarded", "F01": "Planning"}
+        # F02 = Contract Notice (open tender), F03 = Award Notice (already awarded), F01 = Prior Info
+        if type_code == "F03":
+            return None  # skip awarded contracts
+        stage_map = {"F02": "Tender", "F01": "Planning"}
         stage = stage_map.get(type_code, "Planning")
 
         return ProjectRecord(
@@ -222,7 +225,7 @@ class SamGovScraper(BaseScraper):
                             "limit":      limit,
                             "offset":     offset,
                             "postedFrom": "01/01/2025",
-                            "postedTo":   "12/31/2025",
+                            "ptype":      "o,k",   # solicitations only
                         },
                         timeout=30,
                     )
@@ -262,23 +265,21 @@ class SamGovScraper(BaseScraper):
         # Stage from opportunity type
         opportunity_type = raw.get("type", "").lower()
         if "award" in opportunity_type:
-            stage = "Awarded"
+            return None  # skip awarded contracts — no longer biddable
         elif "solicitation" in opportunity_type or "bid" in opportunity_type:
             stage = "Tender"
         else:
             stage = "Planning"
 
         # Location
-        place = raw.get("placeOfPerformance") or {}
-        city_obj  = place.get("city") or {}
-        state_obj = place.get("state") or {}
-        city  = city_obj.get("name", "") if isinstance(city_obj, dict) else ""
-        state = state_obj.get("code", "") if isinstance(state_obj, dict) else ""
-        location_display = ", ".join(p for p in [city, state, "USA"] if p)
+        place = raw.get("placeOfPerformance", {})
+        city  = place.get("city", {}).get("name", "")
+        state = place.get("state", {}).get("code", "")
+        location_display = f"{city}, {state}, USA".strip(", ")
 
         # Stakeholder
-        org = raw.get("organizationHierarchy") or []
-        owner_name = org[0].get("name", "") if org and isinstance(org[0], dict) else raw.get("department", "") or ""
+        org = raw.get("organizationHierarchy", [{}])
+        owner_name = org[0].get("name", "") if org else raw.get("department", "")
 
         return ProjectRecord(
             external_id         = raw.get("noticeId", raw.get("solicitationNumber", "")),

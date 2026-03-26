@@ -267,12 +267,9 @@ class NSWEPlanningScraper(BaseScraper):
 
         # Stage
         status = (raw.get("ApplicationStatus") or "").lower()
-        if "approved" in status or "granted" in status:
-            stage = "Awarded"
-        elif "under assessment" in status or "submitted" in status:
-            stage = "Planning"
-        else:
-            stage = "Planning"
+        if any(s in status for s in ("approved", "granted", "refused", "withdrawn", "lapsed")):
+            return None  # skip non-actionable
+        stage = "Planning"  # under assessment / submitted = still biddable
 
         applicant = raw.get("ApplicantName") or raw.get("Applicant") or ""
 
@@ -395,14 +392,14 @@ class WorldBankScraper(BaseScraper):
 
         # Stage
         status = (raw.get("status") or "").lower()
-        if "active" in status:
-            stage = "Under Construction"
-        elif "pipeline" in status:
+        if "closed" in status or "dropped" in status or "cancelled" in status:
+            return None  # skip non-actionable
+        if "pipeline" in status:
             stage = "Planning"
-        elif "closed" in status:
-            stage = "Completed"
+        elif "active" in status:
+            stage = "Planning"  # active = under appraisal/preparation, still biddable
         else:
-            stage = "Awarded"
+            stage = "Planning"
 
         # Dates
         board_date   = raw.get("boardapprovaldate") or ""
@@ -513,7 +510,9 @@ class ContractsFinderScraper(BaseScraper):
 
         # Stage
         notice_type = (notice.get("type") or notice.get("noticeType") or "").lower()
-        stage = "Awarded" if "award" in notice_type else "Tender"
+        if "award" in notice_type or "cancel" in notice_type:
+            return None  # skip awarded/cancelled notices
+        stage = "Tender"
 
         # Location
         location = notice.get("location") or notice.get("deliveryLocation") or {}
