@@ -574,7 +574,7 @@ class PhiladelphiaPermitScraper(BaseScraper):
         except (ValueError, TypeError):
             lat, lng = None, None
 
-        contractor = raw.get("contractorcompanyname") or raw.get("contractor") or ""
+        contractor = (raw.get("contractorcompanyname") or raw.get("contractorname") or raw.get("contractor") or "").strip()
         issue_date = (raw.get("issueddate") or raw.get("issue_date") or raw.get("applieddate") or "")[:10]
 
         status = (raw.get("statuscurrent") or raw.get("status") or "").lower()
@@ -972,8 +972,16 @@ class SanFranciscoPermitScraper(BaseScraper):
             return None  # skip non-actionable
         stage  = "Awarded" if any(s in status for s in ("issued", "approved")) else "Planning"
 
-        contractor = raw.get("contractor") or raw.get("applicant") or ""
+        # SF dataset fields: contractor_company_name, applicant_name
+        contractor = (raw.get("contractor_company_name") or raw.get("contractor") or "").strip()
+        applicant  = (raw.get("applicant_name") or raw.get("applicant") or "").strip()
         issue_date = (raw.get("issued_date") or raw.get("filed_date") or "")[:10]
+
+        stakeholders = []
+        if contractor:
+            stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        if applicant and applicant != contractor:
+            stakeholders.append({"name": applicant, "role": "Owner"})
 
         return ProjectRecord(
             external_id      = f"sf-{permit_id}",
@@ -991,7 +999,7 @@ class SanFranciscoPermitScraper(BaseScraper):
             timeline_display = issue_date,
             lat              = lat,
             lng              = lng,
-            stakeholders     = [{"name": contractor, "role": "Main Contractor"}] if contractor else [],
+            stakeholders     = stakeholders,
         )
 
 # ═══════════════════════════════════════════════════════════════
