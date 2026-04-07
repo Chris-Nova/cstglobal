@@ -7,7 +7,7 @@ const VALID_SOURCES = [
   'ted_eu','sam_gov','contracts_finder','world_bank',
   'uk_planning','nsw_eplanning',
   'nyc_permits','chicago_permits','la_permits','houston_permits','philly_permits','usace',
-  'philly_arcgis','denver_permits','sf_permits','boston_permits','sj_permits','baltimore_permits',
+  'philly_arcgis','denver_permits','sf_permits','boston_permits','sj_permits','baltimore_permits','nashville_permits','nola_permits','lv_permits','raleigh_permits',
 ];
 
 const SOURCE_META: Record<string, { label: string; region: string; type: string }> = {
@@ -29,6 +29,10 @@ const SOURCE_META: Record<string, { label: string; region: string; type: string 
   boston_permits:   { label: "Boston Permits",      region: "Americas",     type: "City Permit" },
   sj_permits:       { label: "San Jose Permits",    region: "Americas",     type: "City Permit" },
   baltimore_permits:{ label: "Baltimore Permits",   region: "Americas",     type: "City Permit" },
+  nashville_permits:{ label: "Nashville Permits",  region: "Americas",     type: "City Permit" },
+  nola_permits:     { label: "New Orleans Permits",region: "Americas",     type: "City Permit" },
+  lv_permits:       { label: "Las Vegas Permits",  region: "Americas",     type: "City Permit" },
+  raleigh_permits:  { label: "Raleigh Permits",    region: "Americas",     type: "City Permit" },
 };
 
 // GET /api/etl — return source stats (count per source, last run)

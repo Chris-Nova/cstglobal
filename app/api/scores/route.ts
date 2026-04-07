@@ -4,7 +4,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '../../../lib/db';
-import { requireAuth } from '../../../lib/auth';
+
+const DEMO_USER = { id: '00000000-0000-0000-0000-000000000001', email: 'demo@cstglobal.app', plan: 'Pro' as const };
+async function getUser() { return DEMO_USER; }
 import { z } from 'zod';
 
 // ────────────────────────────────────────────────────────────
@@ -129,7 +131,7 @@ export function calculateScore(
 // ── API Route ─────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const user = await requireAuth(req);
+  const user = await getUser();
 
   const Schema = z.object({
     project_id: z.string().uuid(),

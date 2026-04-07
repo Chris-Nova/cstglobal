@@ -37,6 +37,10 @@ from etl.scrapers.city_permits import (
     BostonPermitScraper,
     SanJosePermitScraper,
     BaltimorePermitScraper,
+    NashvillePermitScraper,
+    NewOrleansPermitScraper,
+    LasVegasPermitScraper,
+    RaleighPermitScraper,
 )
 
 SCRAPERS = {
@@ -61,6 +65,10 @@ SCRAPERS = {
     "boston_permits":   BostonPermitScraper,
     "sj_permits":       SanJosePermitScraper,
     "baltimore_permits":BaltimorePermitScraper,
+    "nashville_permits":NashvillePermitScraper,
+    "nola_permits":     NewOrleansPermitScraper,
+    "lv_permits":       LasVegasPermitScraper,
+    "raleigh_permits":  RaleighPermitScraper,
 }
 
 SCRAPER_META = {
@@ -82,6 +90,10 @@ SCRAPER_META = {
     "boston_permits":   {"label": "Boston Permits",      "region": "Americas",     "type": "City Permit"},
     "sj_permits":       {"label": "San Jose Permits",    "region": "Americas",     "type": "City Permit"},
     "baltimore_permits":{"label": "Baltimore Permits",   "region": "Americas",     "type": "City Permit"},
+    "nashville_permits":{"label": "Nashville Permits",  "region": "Americas",     "type": "City Permit"},
+    "nola_permits":     {"label": "New Orleans Permits","region": "Americas",    "type": "City Permit"},
+    "lv_permits":       {"label": "Las Vegas Permits",  "region": "Americas",     "type": "City Permit"},
+    "raleigh_permits":  {"label": "Raleigh Permits",    "region": "Americas",     "type": "City Permit"},
 }
 
 logging.basicConfig(

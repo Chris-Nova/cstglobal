@@ -1254,3 +1254,722 @@ class BaltimorePermitScraper(BaseScraper):
             lng              = lng,
             stakeholders     = [{"name": contractor, "role": "Main Contractor"}] if contractor else [],
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 13 — City of Nashville Building Permits
+# Fast-growing sunbelt city, strong commercial/mixed-use
+# Dataset: Building Permits (3h5w-q8b7)
+# ═══════════════════════════════════════════════════════════════
+
+class NashvillePermitScraper(BaseScraper):
+    """Nashville building permits via Socrata."""
+
+    source_name = "Nashville Permits"
+    DATASET_ID  = "3h5w-q8b7"
+    BASE_URL    = "https://data.nashville.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[Nashville Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[Nashville Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[Nashville Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("const_cost", "construction_cost", "estimated_cost", "job_value", "cost"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",", "").replace("$", ""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("permitnum") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type_description") or raw.get("permit_type") or raw.get("permittype") or ""
+        desc        = raw.get("description") or raw.get("work_description") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("location_address") or ""
+        zip_code    = raw.get("zip_code") or raw.get("zip") or ""
+        location    = f"{address}, Nashville, TN {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("final", "complete", "cancelled", "expired", "withdrawn")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or raw.get("applicant_name") or "").strip()
+        owner      = (raw.get("owner_name") or raw.get("property_owner") or "").strip()
+        issue_date = (raw.get("date_issued") or raw.get("issue_date") or raw.get("issued_date") or "")[:10]
+        stakeholders = []
+        if owner: stakeholders.append({"name": owner, "role": "Owner"})
+        if contractor and contractor != owner: stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        return ProjectRecord(
+            external_id      = f"nas-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = f"https://permits.nashville.gov/",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 14 — City of New Orleans Building Permits
+# Growing Gulf Coast market, major post-Katrina redevelopment
+# Dataset: Permits BLDS (72f9-bi28)
+# ═══════════════════════════════════════════════════════════════
+
+class NewOrleansPermitScraper(BaseScraper):
+    """New Orleans building permits via Socrata."""
+
+    source_name = "New Orleans Permits"
+    DATASET_ID  = "72f9-bi28"
+    BASE_URL    = "https://data.nola.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[New Orleans Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[New Orleans Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[New Orleans Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("estimated_cost", "declared_valuation", "job_value", "cost", "value"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",", "").replace("$", ""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("id") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type") or raw.get("work_type") or raw.get("permittype") or ""
+        desc        = raw.get("description") or raw.get("work_description") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("location") or ""
+        zip_code    = raw.get("zip") or raw.get("zip_code") or ""
+        location    = f"{address}, New Orleans, LA {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("final", "complete", "cancelled", "expired", "withdrawn", "closed")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or "").strip()
+        owner      = (raw.get("owner_name") or raw.get("applicant") or "").strip()
+        issue_date = (raw.get("date_issued") or raw.get("issue_date") or raw.get("issued_date") or "")[:10]
+        stakeholders = []
+        if owner: stakeholders.append({"name": owner, "role": "Owner"})
+        if contractor and contractor != owner: stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        return ProjectRecord(
+            external_id      = f"nola-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = "https://data.nola.gov/Housing-Land-Use-and-Blight/Permits-BLDS/72f9-bi28",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 15 — City of Las Vegas Building Permits
+# Major resort/commercial construction hub
+# Dataset: Building Permits (wpyf-qpia)
+# ═══════════════════════════════════════════════════════════════
+
+class LasVegasPermitScraper(BaseScraper):
+    """Las Vegas building permits via Socrata."""
+
+    source_name = "Las Vegas Permits"
+    DATASET_ID  = "wpyf-qpia"
+    BASE_URL    = "https://opendata.lasvegasnevada.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[Las Vegas Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[Las Vegas Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[Las Vegas Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("declared_valuation", "estimated_cost", "job_value", "valuation", "cost"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",", "").replace("$", ""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("permit_num") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type") or raw.get("work_type") or ""
+        desc        = raw.get("description") or raw.get("work_description") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("site_address") or ""
+        zip_code    = raw.get("zip_code") or raw.get("zip") or ""
+        location    = f"{address}, Las Vegas, NV {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("final", "complete", "cancelled", "expired", "withdrawn")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or raw.get("license_holder") or "").strip()
+        owner      = (raw.get("owner_name") or raw.get("applicant_name") or "").strip()
+        issue_date = (raw.get("issue_date") or raw.get("date_issued") or raw.get("issued_date") or "")[:10]
+        stakeholders = []
+        if owner: stakeholders.append({"name": owner, "role": "Owner"})
+        if contractor and contractor != owner: stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        return ProjectRecord(
+            external_id      = f"lv-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = "https://opendata.lasvegasnevada.gov/Building-and-Safety/Building-Permits/wpyf-qpia",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 16 — City of Raleigh Building Permits
+# Fast-growing Research Triangle, strong tech/commercial
+# Dataset: Building Permits with Parcel ID (b9nv-68kk)
+# ═══════════════════════════════════════════════════════════════
+
+class RaleighPermitScraper(BaseScraper):
+    """Raleigh building permits via Socrata."""
+
+    source_name = "Raleigh Permits"
+    DATASET_ID  = "b9nv-68kk"
+    BASE_URL    = "https://data.raleighnc.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[Raleigh Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[Raleigh Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[Raleigh Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("job_value", "declared_valuation", "estimated_cost", "cost", "value"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",", "").replace("$", ""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("objectid") or raw.get("permit_number") or raw.get("permitnum") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("work_class") or raw.get("permit_type") or raw.get("permittype") or ""
+        desc        = raw.get("description") or raw.get("work_description") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("site_address") or ""
+        zip_code    = raw.get("zip") or raw.get("zip_code") or ""
+        location    = f"{address}, Raleigh, NC {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("final", "complete", "cancelled", "expired", "withdrawn")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or "").strip()
+        owner      = (raw.get("owner") or raw.get("applicant_name") or "").strip()
+        issue_date = (raw.get("issued_date") or raw.get("issue_date") or raw.get("date_issued") or "")[:10]
+        stakeholders = []
+        if owner: stakeholders.append({"name": owner, "role": "Owner"})
+        if contractor and contractor != owner: stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        return ProjectRecord(
+            external_id      = f"ral-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = "https://data.raleighnc.gov/Permits/Building-Permits-with-Parcel-ID/b9nv-68kk",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 13 — City of Nashville Building Permits
+# Fast-growing city, strong commercial/mixed-use pipeline
+# Dataset: Building Permits (3h5w-q8b7)
+# ═══════════════════════════════════════════════════════════════
+
+class NashvillePermitScraper(BaseScraper):
+    """Nashville building permits via Socrata."""
+
+    source_name = "Nashville Permits"
+    DATASET_ID  = "3h5w-q8b7"
+    BASE_URL    = "https://data.nashville.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN") or os.environ.get("NYC_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[Nashville Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[Nashville Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[Nashville Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("const_cost", "const_value", "estimated_cost", "job_value", "cost"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",","").replace("$",""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("permit_num") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type_description") or raw.get("permit_type") or raw.get("type") or ""
+        desc        = raw.get("description") or raw.get("work_description") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("location_address") or ""
+        zip_code    = raw.get("zip_code") or raw.get("zip") or ""
+        location    = f"{address}, Nashville, TN {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("finaled", "cancelled", "expired", "withdrawn", "complete")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or "").strip()
+        applicant  = (raw.get("applicant_name") or raw.get("applicant") or "").strip()
+        issue_date = (raw.get("issue_date") or raw.get("issued_date") or "")[:10]
+        stakeholders = []
+        if contractor:
+            stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        if applicant and applicant != contractor:
+            stakeholders.append({"name": applicant, "role": "Owner"})
+        return ProjectRecord(
+            external_id      = f"nas-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = f"https://data.nashville.gov/resource/{self.DATASET_ID}",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 14 — City of New Orleans Building Permits
+# Growing Gulf Coast market, strong hospitality/mixed-use
+# Dataset: Permits BLDS (72f9-bi28)
+# ═══════════════════════════════════════════════════════════════
+
+class NewOrleansPermitScraper(BaseScraper):
+    """New Orleans building permits via Socrata."""
+
+    source_name = "New Orleans Permits"
+    DATASET_ID  = "72f9-bi28"
+    BASE_URL    = "https://data.nola.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN") or os.environ.get("NYC_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[New Orleans Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[New Orleans Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[New Orleans Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("estimated_cost", "declared_valuation", "const_cost", "job_value", "cost"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",","").replace("$",""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("permit_no") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type") or raw.get("type") or ""
+        desc        = raw.get("description") or raw.get("work_type") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("location_address") or ""
+        zip_code    = raw.get("zip_code") or raw.get("zip") or ""
+        location    = f"{address}, New Orleans, LA {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("finaled", "cancelled", "expired", "withdrawn", "complete", "closed")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or "").strip()
+        applicant  = (raw.get("owner_name") or raw.get("applicant") or "").strip()
+        issue_date = (raw.get("issue_date") or raw.get("issued_date") or "")[:10]
+        stakeholders = []
+        if contractor:
+            stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        if applicant and applicant != contractor:
+            stakeholders.append({"name": applicant, "role": "Owner"})
+        return ProjectRecord(
+            external_id      = f"nol-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = f"https://data.nola.gov/resource/{self.DATASET_ID}",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 15 — City of Las Vegas Building Permits
+# Major commercial/hospitality construction hub
+# Dataset: Building Permits (wpyf-qpia)
+# ═══════════════════════════════════════════════════════════════
+
+class LasVegasPermitScraper(BaseScraper):
+    """Las Vegas building permits via Socrata."""
+
+    source_name = "Las Vegas Permits"
+    DATASET_ID  = "wpyf-qpia"
+    BASE_URL    = "https://opendata.lasvegasnevada.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN") or os.environ.get("NYC_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[Las Vegas Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[Las Vegas Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[Las Vegas Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("declared_valuation", "estimated_cost", "job_value", "valuation", "cost"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",","").replace("$",""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("permit_num") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type") or raw.get("type_of_work") or ""
+        desc        = raw.get("description") or raw.get("work_description") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("location_address") or ""
+        zip_code    = raw.get("zip_code") or raw.get("zip") or ""
+        location    = f"{address}, Las Vegas, NV {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("finaled", "cancelled", "expired", "withdrawn", "complete", "closed")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_name") or raw.get("contractor") or "").strip()
+        applicant  = (raw.get("owner_name") or raw.get("applicant") or "").strip()
+        issue_date = (raw.get("issue_date") or raw.get("issued_date") or "")[:10]
+        stakeholders = []
+        if contractor:
+            stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        if applicant and applicant != contractor:
+            stakeholders.append({"name": applicant, "role": "Owner"})
+        return ProjectRecord(
+            external_id      = f"lvg-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = f"https://opendata.lasvegasnevada.gov/resource/{self.DATASET_ID}",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCRAPER 16 — City of Raleigh Building Permits
+# Fast-growing Research Triangle, strong tech/commercial
+# Dataset: Building Permits with Parcel ID (b9nv-68kk)
+# ═══════════════════════════════════════════════════════════════
+
+class RaleighPermitScraper(BaseScraper):
+    """Raleigh building permits via Socrata."""
+
+    source_name = "Raleigh Permits"
+    DATASET_ID  = "b9nv-68kk"
+    BASE_URL    = "https://data.raleighnc.gov"
+
+    def fetch_raw(self) -> list[dict]:
+        app_token = os.environ.get("SOCRATA_APP_TOKEN") or os.environ.get("NYC_APP_TOKEN", "")
+        try:
+            resp = requests.get(
+                f"{self.BASE_URL}/resource/{self.DATASET_ID}.json",
+                params={"$limit": 1000, "$$app_token": app_token},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            records = resp.json()
+            if records:
+                logger.info(f"[Raleigh Permits] Sample fields: {list(records[0].keys())[:15]}")
+            filtered = [r for r in records if self._parse_cost(r) >= MIN_VALUE_USD]
+            logger.info(f"[Raleigh Permits] Fetched {len(records)} raw, {len(filtered)} filtered")
+            return filtered
+        except requests.RequestException as e:
+            logger.warning(f"[Raleigh Permits] Fetch failed: {e}")
+            return []
+
+    def _parse_cost(self, r):
+        for f in ("estimated_value", "declared_valuation", "job_value", "cost", "valuation"):
+            v = r.get(f)
+            if v:
+                try: return float(str(v).replace(",","").replace("$",""))
+                except: pass
+        return 0
+
+    def normalize(self, raw: dict) -> Optional[ProjectRecord]:
+        permit_id = (raw.get("permit_number") or raw.get("permitnumber") or raw.get("permit_num") or "").strip()
+        if not permit_id:
+            return None
+        value = self._parse_cost(raw)
+        if value < MIN_VALUE_USD:
+            return None
+        permit_type = raw.get("permit_type") or raw.get("work_class") or ""
+        desc        = raw.get("description") or raw.get("comments") or ""
+        title       = f"{permit_type}: {str(desc)[:120]}" if desc else permit_type or "Building Permit"
+        address     = raw.get("address") or raw.get("location_address") or ""
+        zip_code    = raw.get("zip_code") or raw.get("zip") or ""
+        location    = f"{address}, Raleigh, NC {zip_code}".strip(", ")
+        try:
+            lat = float(raw["latitude"])  if raw.get("latitude")  else None
+            lng = float(raw["longitude"]) if raw.get("longitude") else None
+        except (ValueError, TypeError):
+            lat, lng = None, None
+        status = (raw.get("status") or raw.get("permit_status") or "").lower()
+        if any(s in status for s in ("finaled", "cancelled", "expired", "withdrawn", "complete", "closed")):
+            return None
+        stage      = "Awarded" if "issued" in status or "approved" in status else "Planning"
+        contractor = (raw.get("contractor_company_name") or raw.get("contractor") or "").strip()
+        applicant  = (raw.get("applicant_name") or raw.get("owner_name") or "").strip()
+        issue_date = (raw.get("issued_date") or raw.get("issue_date") or "")[:10]
+        stakeholders = []
+        if contractor:
+            stakeholders.append({"name": contractor, "role": "Main Contractor"})
+        if applicant and applicant != contractor:
+            stakeholders.append({"name": applicant, "role": "Owner"})
+        return ProjectRecord(
+            external_id      = f"ral-{permit_id}",
+            source_name      = self.source_name,
+            source_url       = f"https://data.raleighnc.gov/resource/{self.DATASET_ID}",
+            title            = title[:500],
+            description      = str(desc)[:2000] if desc else None,
+            value_usd        = value,
+            value_currency   = "USD",
+            location_display = location[:500],
+            location_country = "US",
+            region           = "Americas",
+            sector           = infer_sector(f"{title} {desc}"),
+            stage            = stage,
+            timeline_display = issue_date,
+            lat              = lat,
+            lng              = lng,
+            stakeholders     = stakeholders,
+        )
