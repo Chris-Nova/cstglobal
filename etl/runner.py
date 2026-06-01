@@ -90,10 +90,10 @@ SCRAPER_META = {
     "boston_permits":   {"label": "Boston Permits",      "region": "Americas",     "type": "City Permit"},
     "sj_permits":       {"label": "San Jose Permits",    "region": "Americas",     "type": "City Permit"},
     "baltimore_permits":{"label": "Baltimore Permits",   "region": "Americas",     "type": "City Permit"},
-    "nashville_permits":{"label": "Nashville Permits",  "region": "Americas",     "type": "City Permit"},
+    "nashville_permits":{"label": "Louisville Permits",  "region": "Americas",     "type": "City Permit"},
     "nola_permits":     {"label": "New Orleans Permits","region": "Americas",    "type": "City Permit"},
-    "lv_permits":       {"label": "Las Vegas Permits",  "region": "Americas",     "type": "City Permit"},
-    "raleigh_permits":  {"label": "Raleigh Permits",    "region": "Americas",     "type": "City Permit"},
+    "lv_permits":       {"label": "Cincinnati Permits",  "region": "Americas",     "type": "City Permit"},
+    "raleigh_permits":  {"label": "Chattanooga Permits",    "region": "Americas",     "type": "City Permit"},
 }
 
 logging.basicConfig(
